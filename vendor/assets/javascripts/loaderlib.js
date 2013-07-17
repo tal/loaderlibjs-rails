@@ -1,4 +1,13 @@
 (function(window,funcName) {
+  /**
+  * Creates a new loader library, returns itself.
+  *
+  *   window.NS = new LoaderLib();
+  *
+  * @class LoaderLib
+  * @param {Function} a callback which recieves the new instance of the class
+  * @constructor
+  */
   function LoaderLib(cb) {
     this._modules = [];
 
@@ -13,6 +22,23 @@
     this._modules.push(module);
   }
 
+  /**
+  * Way of defining the new module on the library
+  *
+  *   var module = NS.has('my.module');
+  *   NS.my.module === module; // => true
+  *
+  * Or preferably
+  *
+  *   NS.has('my.module',function(module) {
+  *     module.init = function() {};
+  *   });
+  *
+  * @param {String} Namespace to define new module
+  * @param {Function} closure for using the new module.
+  * @returns {Object}
+  * @method
+  */
   LoaderLib.prototype.has = function(objname, cb) {
     var objs, target;
     objs = objname.split('.');
@@ -33,18 +59,30 @@
     return target;
   };
 
+  /**
+  * Method for either registering a function to be fired when the
+  * ready event is fired, or when no function is passed it will fire
+  * the ready event.
+  *
+  * See readme for how the ready function can be used in conjunction
+  * with modules defined in #has.
+  *
+  * @param {Function} add a function to be fired when the ready
+  *         event is fired.
+  * @method
+  */
   LoaderLib.prototype.ready = function(cb) {
     if (cb) {
-      this._register({ready: cb}); return;
+      this._register({ready: cb});
+    } else {
+      var module;
+      for (var i = 0; i < this._modules.length; i++) {
+        module = this._modules[i];
+        if (typeof module.ready === funcName) {
+          module.ready();
+        }
+      };
     }
-
-    var module;
-    for (var i = 0; i < this._modules.length; i++) {
-      module = this._modules[i];
-      if (typeof module.ready === funcName) {
-        module.ready();
-      }
-    };
   };
 
   function initName(obj,name) {
@@ -56,6 +94,23 @@
     }
   }
 
+  /**
+  * Initializes modules given certain parameters.
+  *
+  * Given the options: opts = {module: 'foo', actions: ['bar','baz']}
+  * The call NS.init(opts) will call the following functions:
+  *
+  * - NS.foo.bar()
+  * - NS.foo.baz()
+  * - NS.foo.bar.init()
+  * - NS.foo.baz.init()
+  * - NS.bar.init()
+  * - NS.bar.foo()
+  * - NS.baz.init()
+  * - NS.baz.foo()
+  *
+  * @method
+  */
   LoaderLib.prototype.init = function initLoader(opts) {
     var moduleName, module, actionName, action, actions, subActionName, i, j;
 
@@ -72,18 +127,37 @@
       if (module) {
         moduleAction = module[actionName];
 
-        if (moduleAction && typeof moduleAction.init === funcName) moduleAction.init();
-        if (typeof module[actionName] === funcName) module[actionName]();
+        if (moduleAction && typeof moduleAction.init === funcName) {
+          this.log("calling: NS."+moduleName+'.'+actionName+'.init()');
+          moduleAction.init()
+        }
+        if (typeof module[actionName] === funcName) {
+          this.log("calling: NS."+moduleName+'.'+actionName+'()');
+          module[actionName]();
+        }
       }
 
       actionRoot = this[actionName];
       if (actionRoot) {
-        if (typeof actionRoot.init === funcName) actionRoot.init();
-        if (typeof actionRoot[moduleName] === funcName) actionRoot[moduleName]();
+        if (typeof actionRoot.init === funcName) {
+          this.log("calling: NS."+actionName+'.init()');
+          actionRoot.init();
+        }
+        if (typeof actionRoot[moduleName] === funcName) {
+          this.log("calling: NS."+actionName+'.'+moduleName+'()');
+          actionRoot[moduleName]();
+        }
       }
     }
   };
 
+  LoaderLib.prototype.log = function() {};
+
+  /**
+  * Calls init, but builds the options from the class and id tag on the body element.
+  *
+  * @method
+  */
   LoaderLib.prototype.initFromBody = function initFromBody() {
     this.init({
       module: document.body.id || 'default',
@@ -101,8 +175,4 @@
       }
     }
   };
-
-  LoaderLib.prototype.setVars = function setVars(vars) {
-
-  }
 }).call(this, window,'function');
